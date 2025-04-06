@@ -49,11 +49,10 @@ class InterfacePeripherals:
         self.__menu_autohide_tm = self.__model.get_viewer_config()["menu_autohide_tm"]
         self.__buttons = self.__model.get_peripherals_config()["buttons"]
 
-        # Touch input configuration
-        peripherals_config = self.__model.get_peripherals_config()
-        self.__touch_debounce_time = peripherals_config.get("touch_debounce_time", 1)  # seconds
-        self.__touch_move_threshold = peripherals_config.get("touch_move_threshold", 100)  # pixels
+        # Touch input improvements
         self.__last_touch_down_time = 0
+        self.__touch_debounce_time = 0.2  # 200ms debounce time
+        self.__touch_move_threshold = 10  # pixels movement allowed
         self.__touch_start_position = None
         self.__is_touch_active = False
 
@@ -305,8 +304,8 @@ class InterfacePeripherals:
                 return
 
     def __distance(self, pos1, pos2):
-        """Calculate distance between two points (squared distance for comparison)."""
-        return ((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)
+        """Calculate distance between two points."""
+        return ((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)**0.5
 
     def __process_touch_click(self):
         """Process a validated touch click."""
@@ -328,7 +327,7 @@ class InterfacePeripherals:
         if self.__pointer_moved():
             if self.__timestamp > self.__last_check_display_on + 2.0: # this @getter is potentially expensive to run so will slow the mouse
                 self.__last_check_display_on = self.__timestamp
-                if not self.controller.display_is_on:
+                if self.controller.display_is_on:
                     self.controller.display_is_on = True
 
         # Show or hide menu
