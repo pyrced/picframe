@@ -51,8 +51,8 @@ class InterfacePeripherals:
 
         # Touch input improvements
         self.__last_touch_down_time = 0
-        self.__touch_debounce_time = 0.2  # 200ms debounce time
-        self.__touch_move_threshold = 10  # pixels movement allowed before considering it a drag
+        self.__touch_debounce_time = 0.3  # 300ms debounce time
+        self.__touch_move_threshold = 100  # pixels movement allowed
         self.__touch_start_position = None
         self.__is_touch_active = False
 
