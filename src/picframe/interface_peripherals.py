@@ -49,6 +49,13 @@ class InterfacePeripherals:
         self.__menu_autohide_tm = self.__model.get_viewer_config()["menu_autohide_tm"]
         self.__buttons = self.__model.get_peripherals_config()["buttons"]
 
+        # Touch input improvements
+        self.__last_touch_down_time = 0
+        self.__touch_debounce_time = 0.2  # 200ms debounce time
+        self.__touch_move_threshold = 10  # pixels movement allowed
+        self.__touch_start_position = None
+        self.__is_touch_active = False
+
         self.__gui = self.__get_gui()
         self.__mouse = self.__get_mouse()
         self.__keyboard = self.__get_keyboard()
@@ -263,24 +270,58 @@ class InterfacePeripherals:
                     self.controller.stop()
 
     def __handle_touch_input(self) -> None:
-        """Due to pi3d not reliably detecting touch as Mouse.LEFT_BUTTON event
-        when a touch happens at any position with x or y lower than previous touch,
-        any pointer movement is considered a click event.
-        """
-        if self.__pointer_moved():
-            if not self.controller.display_is_on:
-                self.controller.display_is_on = True
-            elif self.__pointer_position[1] < self.__viewer.display_height // 2 - self.__menu_height:
-                # Touch in main area
-                if self.menu_is_on:
-                    self.menu_is_on = False
-                else:
-                    self.__handle_click()
+        """Improved touch input handling with proper start/move/end detection."""
+        current_time = time.time()
+        
+        # Check if touch just started
+        if not self.__is_touch_active and self.__pointer_moved():
+            self.__touch_start_position = self.__pointer_position
+            self.__last_touch_down_time = current_time
+            self.__is_touch_active = True
+            return  # Don't process click on touch start
+        
+        # Check if touch is active (finger down)
+        if self.__is_touch_active:
+            # Check if touch ended (finger lifted)
+            if not self.__pointer_moved():
+                self.__is_touch_active = False
+                
+                # Only register as click if:
+                # 1. Within debounce time
+                # 2. Movement was below threshold
+                if (current_time - self.__last_touch_down_time < self.__touch_debounce_time and
+                    self.__touch_start_position and
+                    self.__distance(self.__touch_start_position, self.__pointer_position) < self.__touch_move_threshold):
+                    
+                    self.__process_touch_click()
+                return
+            
+            # If we get here, touch is still active (finger moving)
+            # Check if movement exceeds threshold (consider it a drag)
+            if (self.__touch_start_position and 
+                self.__distance(self.__touch_start_position, self.__pointer_position) >= self.__touch_move_threshold):
+                self.__is_touch_active = False  # Cancel the touch
+                return
+
+    def __distance(self, pos1, pos2):
+        """Calculate distance between two points."""
+        return ((pos1[0] - pos2[0])**2 + (pos1[1] - pos2[1])**2)**0.5
+
+    def __process_touch_click(self):
+        """Process a validated touch click."""
+        if not self.controller.display_is_on:
+            self.controller.display_is_on = True
+        elif self.__pointer_position[1] < self.__viewer.display_height // 2 - self.__menu_height:
+            # Touch in main area
+            if self.menu_is_on:
+                self.menu_is_on = False
             else:
-                # Touch in menu area
-                if self.menu_is_on:
-                    self.__handle_click()
-                self.menu_is_on = True  # Reset clock for autohide
+                self.__handle_click()
+        else:
+            # Touch in menu area
+            if self.menu_is_on:
+                self.__handle_click()
+            self.menu_is_on = True  # Reset clock for autohide
 
     def __handle_mouse_input(self) -> None:
         if self.__pointer_moved():
@@ -302,15 +343,6 @@ class InterfacePeripherals:
 
     def __update_pointer_position(self) -> None:
         position_x, position_y = self.__mouse.position()
-        """ # the mouse location should be generated correctly by X11 or SDL2 in the Mouse class now
-        if self.__input_type == "mouse":
-            position_x -= self.__viewer.display_width // 2
-            position_y -= self.__viewer.display_height // 2
-        elif self.__input_type == "touch":
-            # Workaround, pi3d seems to always assume screen ratio 4:3 so touch is incorrectly translated
-            # to x, y on screens with a different ratio
-            position_y *= self.__viewer.display_height / (self.__viewer.display_width * 3 / 4)
-        """
         self.__pointer_position = (position_x, position_y)
 
     def __pointer_moved(self) -> bool:
