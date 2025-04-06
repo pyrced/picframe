@@ -343,6 +343,15 @@ class InterfacePeripherals:
 
     def __update_pointer_position(self) -> None:
         position_x, position_y = self.__mouse.position()
+        """ # the mouse location should be generated correctly by X11 or SDL2 in the Mouse class now
+        if self.__input_type == "mouse":
+            position_x -= self.__viewer.display_width // 2
+            position_y -= self.__viewer.display_height // 2
+        elif self.__input_type == "touch":
+            # Workaround, pi3d seems to always assume screen ratio 4:3 so touch is incorrectly translated
+            # to x, y on screens with a different ratio
+            position_y *= self.__viewer.display_height / (self.__viewer.display_width * 3 / 4)
+        """
         self.__pointer_position = (position_x, position_y)
 
     def __pointer_moved(self) -> bool:
